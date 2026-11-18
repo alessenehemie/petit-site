@@ -44,11 +44,24 @@
 
     const bar = el('div', 'chat-bar');
     const file = el('input'); file.type = 'file'; file.accept = 'image/*,video/*'; file.hidden = true;
-    const bFile = el('button', 'chat-ico', '📎'), bMic = el('button', 'chat-ico', '🎤'), bSend = el('button', 'chat-send', '➤');
-    bFile.title = 'Photo ou vidéo'; bMic.title = 'Message vocal'; bSend.title = 'Envoyer';
-    bFile.setAttribute('aria-label', 'Envoyer une photo ou une vidéo'); bMic.setAttribute('aria-label', 'Enregistrer un vocal'); bSend.setAttribute('aria-label', 'Envoyer');
+    const bFile = el('button', 'chat-ico', '📎'), bSticker = el('button', 'chat-ico', '🧸'), bMic = el('button', 'chat-ico', '🎤'), bSend = el('button', 'chat-send', '➤');
+    bFile.title = 'Photo ou vidéo'; bSticker.title = 'Stickers'; bMic.title = 'Message vocal'; bSend.title = 'Envoyer';
+    bFile.setAttribute('aria-label', 'Envoyer une photo ou une vidéo'); bSticker.setAttribute('aria-label', 'Envoyer un sticker'); bMic.setAttribute('aria-label', 'Enregistrer un vocal'); bSend.setAttribute('aria-label', 'Envoyer');
     const txt = el('textarea', 'chat-input'); txt.rows = 1; txt.placeholder = 'Écris un message (ou glisse une photo)…'; txt.maxLength = 3000;
-    bar.append(bFile, txt, bMic, bSend, file);
+    bar.append(bFile, bSticker, txt, bMic, bSend, file);
+
+    // Panneau de stickers
+    const STICKERS = ['🧸', '💖', '🌸', '🥰', '😻', '🍓', '✨', '🦋', '💌', '🌹', '🍫', '🧸', '💗', '💋', '🌻', '🎁'];
+    const stickerPanel = el('div', 'chat-stickers-panel'); stickerPanel.hidden = true;
+    STICKERS.forEach(em => {
+      const sb = el('button', 'chat-sticker-item', em);
+      sb.onclick = async () => {
+        stickerPanel.hidden = true;
+        await post({ k: 'sticker', x: em });
+      };
+      stickerPanel.appendChild(sb);
+    });
+    bSticker.onclick = () => { stickerPanel.hidden = !stickerPanel.hidden; };
 
     const recBar = el('div', 'chat-rec'); recBar.hidden = true;
     const recT = el('span', 'chat-rect', '🔴 0:00'), recX = el('button', 'chat-ico', '✕'), recOk = el('button', 'chat-send', '➤');
@@ -110,7 +123,7 @@
     // Zone Drag & Drop overlay
     const dropOverlay = el('div', 'chat-drop-overlay', '📥 Dépose ta photo ou vidéo ici pour l’envoyer');
     dropOverlay.hidden = true;
-    root.append(top, panel, list, typingEl, info, replyBar, editBar, bar, recBar, dropOverlay);
+    root.append(top, panel, list, typingEl, info, replyBar, editBar, stickerPanel, bar, recBar, dropOverlay);
 
     // Recherche en direct dans les messages chargés
     searchIn.addEventListener('input', () => {
@@ -221,7 +234,7 @@
     const other = o.me === 'admin' ? 'soraya' : 'admin';
     let menuEl = null;
     const closeMenu = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
-    document.addEventListener('click', closeMenu);
+    document.addEventListener('click', e => { closeMenu(); if (!bSticker.contains(e.target) && !stickerPanel.contains(e.target)) stickerPanel.hidden = true; });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
     list.addEventListener('scroll', closeMenu);
 
@@ -290,6 +303,15 @@
         } else if (obj.k === 'text') {
           b.appendChild(el('p', '', String(obj.x)));
           if (entry) entry.plainText = String(obj.x);
+        } else if (obj.k === 'sticker') {
+          const st = el('div', 'chat-media');
+          const span = el('span', '', String(obj.x));
+          span.style.fontSize = '4rem';
+          span.style.display = 'block';
+          span.style.textAlign = 'center';
+          st.appendChild(span);
+          b.appendChild(st);
+          if (entry) entry.plainText = 'sticker';
         } else if (m.mid && (obj.k === 'image' || obj.k === 'video' || obj.k === 'audio')) {
           b.appendChild(mediaNode(m, obj));
           if (entry) entry.plainText = obj.k === 'image' ? 'photo' : obj.k === 'video' ? 'vidéo' : 'vocal';
