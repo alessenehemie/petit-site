@@ -7,6 +7,7 @@
   const PART = 4 * 1024 * 1024;            // taille d'un morceau envoyé au serveur
   const MAX_BYTES = 40 * 1024 * 1024;      // taille maximale d'un média
   const MAX_REC = 180;                     // durée maximale d'un vocal (secondes)
+  const EMOJIS = ['❤️', '👍', '😂', '😮', '😢', '🙏'];
 
   const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   const unb64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
@@ -29,25 +30,45 @@
     const root = o.box; root.textContent = ''; root.classList.add('chat');
     const list = el('div', 'chat-list'), info = el('div', 'chat-info');
     list.setAttribute('aria-live', 'polite'); info.setAttribute('role', 'status');
+
+    // Indicateur "En train d'écrire..."
+    const typingEl = el('div', 'chat-typing'); typingEl.hidden = true;
+    const otherName = o.me === 'admin' ? 'Soraya' : 'Nissi';
+    typingEl.innerHTML = '<span>' + otherName + ' est en train d’écrire</span><span class="dots"><i>.</i><i>.</i><i>.</i></span>';
+
+    // Barre de réponse / citation
+    const replyBar = el('div', 'chat-reply-bar'); replyBar.hidden = true;
+    const replyText = el('div', 'chat-reply-preview');
+    const replyX = el('button', 'chat-ico', '✕'); replyX.title = 'Annuler la réponse';
+    replyBar.append(replyText, replyX);
+
     const bar = el('div', 'chat-bar');
     const file = el('input'); file.type = 'file'; file.accept = 'image/*,video/*'; file.hidden = true;
     const bFile = el('button', 'chat-ico', '📎'), bMic = el('button', 'chat-ico', '🎤'), bSend = el('button', 'chat-send', '➤');
     bFile.title = 'Photo ou vidéo'; bMic.title = 'Message vocal'; bSend.title = 'Envoyer';
     bFile.setAttribute('aria-label', 'Envoyer une photo ou une vidéo'); bMic.setAttribute('aria-label', 'Enregistrer un vocal'); bSend.setAttribute('aria-label', 'Envoyer');
-    const txt = el('textarea', 'chat-input'); txt.rows = 1; txt.placeholder = 'Écris un message…'; txt.maxLength = 3000;
+    const txt = el('textarea', 'chat-input'); txt.rows = 1; txt.placeholder = 'Écris un message (ou glisse une photo)…'; txt.maxLength = 3000;
     bar.append(bFile, txt, bMic, bSend, file);
+
     const recBar = el('div', 'chat-rec'); recBar.hidden = true;
     const recT = el('span', 'chat-rect', '🔴 0:00'), recX = el('button', 'chat-ico', '✕'), recOk = el('button', 'chat-send', '➤');
     recX.title = 'Annuler'; recOk.title = 'Envoyer le vocal';
     recBar.append(recX, recT, recOk);
-    // --- Fond d'écran (choisi sur cet appareil, rien n'est envoyé au serveur) ---
-    const WP = [['doux', 'Doux'], ['nuit', 'Nuit'], ['coeurs', 'Cœurs'], ['ciel', 'Ciel'], ['coucher', 'Coucher'], ['rouge', 'Rouge'], ['noir', 'Noir']];
+
+    // --- Barre supérieure : Recherche + Fond d'écran ---
+    const WP = [['doux', 'Doux'], ['whatsapp', 'WhatsApp'], ['nuit', 'Nuit'], ['coeurs', 'Cœurs'], ['ciel', 'Ciel'], ['coucher', 'Coucher'], ['rouge', 'Rouge'], ['noir', 'Noir']];
     const wpKey = 'chatWp:' + o.me, wpImgKey = 'chatWpImg:' + o.me;
     const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-    const top = el('div', 'chat-top'), bWp = el('button', 'chat-wpbtn', '🎨 Fond d’écran');
+    const top = el('div', 'chat-top');
+    const searchWrap = el('div', 'chat-search-wrap');
+    const searchIn = el('input', 'chat-search'); searchIn.type = 'search'; searchIn.placeholder = '🔍 Rechercher un message…'; searchIn.setAttribute('aria-label', 'Rechercher dans la discussion');
+    searchWrap.appendChild(searchIn);
+
+    const bWp = el('button', 'chat-wpbtn', '🎨 Fond');
     const panel = el('div', 'chat-wp'); panel.hidden = true;
     const wpFile = el('input'); wpFile.type = 'file'; wpFile.accept = 'image/*'; wpFile.hidden = true;
-    top.append(bWp, wpFile);
+    top.append(searchWrap, bWp, wpFile);
+
     const sw = (id, label, extra) => { const b = el('button', 'chat-sw ' + (extra || 'wp-' + id)); b.dataset.wp = id; b.title = label; b.setAttribute('aria-label', 'Fond ' + label); b.appendChild(el('span', '', label)); panel.appendChild(b); return b; };
     function applyWp(id) {
       const img = id === 'photo' ? lsGet(wpImgKey) : null;
@@ -80,12 +101,50 @@
     const editBar = el('div', 'chat-edit'); editBar.hidden = true;
     const editT = el('span', '', '✏️ Modification du message'), editX = el('button', 'chat-ico', '✕'); editX.title = 'Annuler la modification';
     editBar.append(editT, editX);
-    root.append(top, panel, list, info, editBar, bar, recBar);
+
+    // Zone Drag & Drop overlay
+    const dropOverlay = el('div', 'chat-drop-overlay', '📥 Dépose ta photo ou vidéo ici pour l’envoyer');
+    dropOverlay.hidden = true;
+    root.append(top, panel, list, typingEl, info, replyBar, editBar, bar, recBar, dropOverlay);
+
+    // Recherche en direct dans les messages chargés
+    searchIn.addEventListener('input', () => {
+      const q = searchIn.value.trim().toLowerCase();
+      shown.forEach(v => {
+        if (!q) { v.node.hidden = false; return; }
+        const txtContent = (v.plainText || '').toLowerCase();
+        v.node.hidden = !txtContent.includes(q);
+      });
+      list.querySelectorAll('.chat-day').forEach(d => { d.hidden = !!q; });
+    });
+
+    // Glisser-déposer (Drag & Drop)
+    let dragCounter = 0;
+    root.addEventListener('dragenter', e => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+        e.preventDefault(); dragCounter++; dropOverlay.hidden = false;
+      }
+    });
+    root.addEventListener('dragleave', e => {
+      if (dragCounter > 0) { dragCounter--; if (dragCounter === 0) dropOverlay.hidden = true; }
+    });
+    root.addEventListener('dragover', e => {
+      if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault();
+    });
+    root.addEventListener('drop', async e => {
+      e.preventDefault(); dragCounter = 0; dropOverlay.hidden = true;
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      if (f.type.startsWith('image/')) await sendBlob(await shrink(f), 'image');
+      else if (f.type.startsWith('video/')) await sendBlob(f, 'video');
+      else say('❌ Seules les photos et vidéos peuvent être glissées ici.');
+    });
 
     const keyP = crypto.subtle.importKey('raw', unb64(o.keyB64), 'AES-GCM', false, ['encrypt', 'decrypt']);
     const shown = new Map(), blobs = new Map();
     let lastId = '', lastDay = '', busy = false, started = false, timer = 0, infoT = 0, sending = 0;
-    let hidden = new Set(), lu = {}, lastMaj = null, lastRead = '', editing = '';
+    let hidden = new Set(), lu = {}, lastMaj = null, lastRead = '', editing = '', replyingTo = null;
+    let lastTypingSent = 0;
     const seenKey = 'chatSeen:' + o.me;
     const H = (extra) => Object.assign({}, o.headers(), extra || {});
 
@@ -170,17 +229,71 @@
       });
     }
 
-    async function fill(row, m) {
+    async function reactMsg(id, emoji) {
+      try {
+        await api('/api/chat?op=react&id=' + id, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ emoji })
+        });
+        await poll();
+      } catch (e) { say('❌ ' + e.message); }
+    }
+
+    function startReply(m, obj) {
+      cancelEdit();
+      let excerpt = 'Média';
+      if (obj && obj.k === 'text') excerpt = String(obj.x).slice(0, 80) + (String(obj.x).length > 80 ? '…' : '');
+      else if (obj && obj.k === 'image') excerpt = '📷 Photo';
+      else if (obj && obj.k === 'video') excerpt = '🎥 Vidéo';
+      else if (obj && obj.k === 'audio') excerpt = '🎤 Message vocal';
+      const author = m.from === o.me ? 'Toi' : otherName;
+      replyingTo = { id: m.id, author, excerpt };
+      replyText.innerHTML = '<strong>↩ Réponse à ' + author + '</strong><small>' + excerpt.replace(/</g, '&lt;') + '</small>';
+      replyBar.hidden = false;
+      txt.focus();
+    }
+    function cancelReply() { replyingTo = null; replyBar.hidden = true; replyText.textContent = ''; }
+    replyX.onclick = cancelReply;
+
+    async function fill(row, m, entry) {
       row.textContent = '';
       const b = el('div', 'chat-b'); let obj = null;
-      if (m.deleted) { b.classList.add('chat-gone'); b.appendChild(el('p', '', '🚫 Message supprimé')); }
-      else {
+      if (m.deleted) {
+        b.classList.add('chat-gone');
+        b.appendChild(el('p', '', '🚫 Message supprimé'));
+        if (entry) entry.plainText = '';
+      } else {
         try { obj = await decObj(m.enc); } catch (e) {}
-        if (!obj) b.appendChild(el('p', 'chat-lock', '🔒 Message illisible'));
-        else if (obj.k === 'text') b.appendChild(el('p', '', String(obj.x)));
-        else if (m.mid && (obj.k === 'image' || obj.k === 'video' || obj.k === 'audio')) b.appendChild(mediaNode(m, obj));
-        else b.appendChild(el('p', 'chat-lock', '🔒 Message non pris en charge'));
+        if (obj && obj.reply) {
+          const q = el('div', 'chat-quote');
+          q.appendChild(el('strong', '', obj.reply.author || 'Message'));
+          q.appendChild(el('span', '', obj.reply.excerpt || ''));
+          q.onclick = () => {
+            const target = shown.get(obj.reply.id);
+            if (target && target.node) {
+              target.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              target.node.classList.add('chat-highlight');
+              setTimeout(() => target.node.classList.remove('chat-highlight'), 1500);
+            }
+          };
+          b.appendChild(q);
+        }
+        if (!obj) {
+          b.appendChild(el('p', 'chat-lock', '🔒 Message illisible'));
+          if (entry) entry.plainText = '';
+        } else if (obj.k === 'text') {
+          b.appendChild(el('p', '', String(obj.x)));
+          if (entry) entry.plainText = String(obj.x);
+        } else if (m.mid && (obj.k === 'image' || obj.k === 'video' || obj.k === 'audio')) {
+          b.appendChild(mediaNode(m, obj));
+          if (entry) entry.plainText = obj.k === 'image' ? 'photo' : obj.k === 'video' ? 'vidéo' : 'vocal';
+        } else {
+          b.appendChild(el('p', 'chat-lock', '🔒 Message non pris en charge'));
+          if (entry) entry.plainText = '';
+        }
       }
+
       const meta = el('div', 'chat-meta'), d = new Date(m.t);
       meta.appendChild(el('span', '', (m.edited && !m.deleted ? 'modifié · ' : '') + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
       let tick = null;
@@ -188,27 +301,57 @@
       const more = el('button', 'chat-more', '⋯'); more.title = 'Options'; more.setAttribute('aria-label', 'Options du message');
       more.onclick = ev => { ev.stopPropagation(); showMenu(more, m, obj); };
       meta.appendChild(more);
-      b.appendChild(meta); row.appendChild(b);
+      b.appendChild(meta);
+
+      // Affichage des réactions existantes sous la bulle
+      if (!m.deleted && m.reactions && Object.keys(m.reactions).length > 0) {
+        const reactBox = el('div', 'chat-reacts');
+        const entries = Object.entries(m.reactions);
+        const grouped = {};
+        entries.forEach(([who, em]) => {
+          grouped[em] = grouped[em] || [];
+          grouped[em].push(who === o.me ? 'Toi' : otherName);
+        });
+        Object.entries(grouped).forEach(([em, whos]) => {
+          const pill = el('button', 'chat-react-pill' + (m.reactions[o.me] === em ? ' mine' : ''), em + (whos.length > 1 ? ' ' + whos.length : ''));
+          pill.title = whos.join(', ');
+          pill.onclick = ev => { ev.stopPropagation(); reactMsg(m.id, em); };
+          reactBox.appendChild(pill);
+        });
+        b.appendChild(reactBox);
+      }
+
+      row.appendChild(b);
       return tick;
     }
-    async function refill(entry, m) { entry.tick = await fill(entry.node, m); entry.deleted = !!m.deleted; refreshTicks(); }
+    async function refill(entry, m) { entry.tick = await fill(entry.node, m, entry); entry.deleted = !!m.deleted; refreshTicks(); }
     async function add(m) {
       const row = el('div', 'chat-row ' + (m.from === o.me ? 'me' : 'them'));
       const day = new Date(m.t).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
       if (day !== lastDay) { lastDay = day; list.appendChild(el('div', 'chat-day', day)); }
-      const entry = { node: row, from: m.from, id: m.id, tick: null, deleted: !!m.deleted };
+      const entry = { node: row, from: m.from, id: m.id, tick: null, deleted: !!m.deleted, plainText: '' };
       shown.set(m.id, entry); list.appendChild(row);
       await refill(entry, m);
     }
 
-    // Menu d'un message : copier, modifier, supprimer pour moi / pour tous.
+    // Menu d'un message : réactions, répondre, copier, modifier, supprimer pour moi / pour tous.
     function showMenu(btn, m, obj) {
       closeMenu();
       const mine = m.from === o.me, mn = el('div', 'chat-menu');
+      if (!m.deleted) {
+        const emoBar = el('div', 'chat-menu-emojis');
+        EMOJIS.forEach(em => {
+          const eb = el('button', 'chat-emo-btn' + (m.reactions && m.reactions[o.me] === em ? ' active' : ''), em);
+          eb.onclick = ev => { ev.stopPropagation(); closeMenu(); reactMsg(m.id, em); };
+          emoBar.appendChild(eb);
+        });
+        mn.appendChild(emoBar);
+      }
       const item = (label, fn) => { const b = el('button', '', label); b.onclick = ev => { ev.stopPropagation(); closeMenu(); fn(); }; mn.appendChild(b); };
+      if (!m.deleted) item('↩ Répondre', () => startReply(m, obj));
       const isText = !m.deleted && obj && obj.k === 'text';
       if (isText) item('📋 Copier', () => copyText(String(obj.x)));
-      if (isText && mine) item('✏️ Modifier', () => startEdit(m.id, String(obj.x)));
+      if (isText && mine) item('✏️ Modifier', () => startEdit(m.id, String(obj.x), obj.reply || null));
       item('🗑 Supprimer pour moi', () => hideMsg(m.id));
       if (!m.deleted && (mine || o.me === 'admin')) item('🗑 Supprimer pour tous', () => delAll(m.id));
       document.body.appendChild(mn);
@@ -229,8 +372,9 @@
       try { await api('/api/chat?id=' + id, { method: 'DELETE' }); await poll(); }
       catch (e) { say('❌ ' + e.message); }
     }
-    function startEdit(id, text) { editing = id; txt.value = text; grow(); editBar.hidden = false; bSend.textContent = '✓'; txt.focus(); }
-    function cancelEdit() { editing = ''; txt.value = ''; grow(); editBar.hidden = true; bSend.textContent = '➤'; }
+    let editReplyKeep = null;
+    function startEdit(id, text, replyObj) { cancelReply(); editing = id; editReplyKeep = replyObj; txt.value = text; grow(); editBar.hidden = false; bSend.textContent = '✓'; txt.focus(); }
+    function cancelEdit() { editing = ''; editReplyKeep = null; txt.value = ''; grow(); editBar.hidden = true; bSend.textContent = '➤'; }
     editX.onclick = cancelEdit;
 
     // --- Non lus ---
@@ -253,6 +397,7 @@
         const r = await api('/api/chat' + (qs.length ? '?' + qs.join('&') : ''));
         const wasBottom = nearBottom() || !shown.size;
         hidden = new Set(r.cache || []); lu = r.lu || {};
+        typingEl.hidden = !r.isTyping;
         if (lu[o.me] && lu[o.me] > lastRead) lastRead = lu[o.me];
         if (r.ids.length) {
           const set = new Set(r.ids), first = r.ids[0];
@@ -277,13 +422,14 @@
     }
     function schedule() {
       clearTimeout(timer); if (!started) return;
-      const ms = active() ? 4000 : document.hidden ? 90000 : 45000;
+      const ms = active() ? 2500 : document.hidden ? 90000 : 45000;
       timer = setTimeout(async () => { await poll(); schedule(); }, ms);
     }
     document.addEventListener('visibilitychange', () => { if (started && !document.hidden) { poll().then(schedule); } });
 
     // --- Envoi ---
     async function post(obj, mid, parts) {
+      if (replyingTo) { obj.reply = replyingTo; cancelReply(); }
       const body = { enc: await encObj(obj) };
       if (mid) { body.mid = mid; body.parts = parts; }
       await api('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -319,8 +465,10 @@
       const t = txt.value.trim(); if (!t || sending) return;
       if (editing) {
         const id = editing;
+        const payload = { k: 'text', x: t };
+        if (editReplyKeep) payload.reply = editReplyKeep;
         try {
-          await api('/api/chat?op=edit&id=' + id, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enc: await encObj({ k: 'text', x: t }) }) });
+          await api('/api/chat?op=edit&id=' + id, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enc: await encObj(payload) }) });
           cancelEdit(); await poll();
         } catch (e) { say('❌ ' + e.message); }
         return;
@@ -329,11 +477,19 @@
       try { await post({ k: 'text', x: t }); } catch (e) { txt.value = t; grow(); say('❌ Non envoyé : ' + e.message); }
     }
 
+    function notifyTyping() {
+      const now = Date.now();
+      if (now - lastTypingSent > 3500 && txt.value.trim().length > 0) {
+        lastTypingSent = now;
+        api('/api/chat?op=typing', { method: 'PUT' }).catch(() => {});
+      }
+    }
+
     bSend.onclick = sendText;
     const fine = matchMedia('(pointer:fine)').matches;
     txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (fine || e.ctrlKey || e.metaKey)) { e.preventDefault(); sendText(); } });
     function grow() { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; }
-    txt.addEventListener('input', grow);
+    txt.addEventListener('input', () => { grow(); notifyTyping(); });
     bFile.onclick = () => file.click();
     file.onchange = async () => {
       const f = file.files[0]; file.value = ''; if (!f) return;
