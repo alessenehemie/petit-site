@@ -10,6 +10,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Lora:ital,wght@0,500;0,600;1,500&family=Quicksand:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="chat.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pour Soraya">
 </head>
 <body>
 <div id="sky"></div>
@@ -57,6 +61,7 @@
 <button class="alt tile" onclick="showOpen()">💌&#10;Ouvre quand…</button>
 <button class="alt tile" onclick="showTimeline()">⏳&#10;Notre histoire</button>
 <button class="alt tile" onclick="showNight()">🌙&#10;Bonne nuit</button>
+<button class="alt tile" onclick="activerNotifs()">🔔&#10;Activer les notifications</button>
 <button class="alt tile" id="wa" hidden onclick="sendKiss()">😘&#10;Bisou à Nissi</button>
 </div></section>
 
@@ -92,6 +97,7 @@
 <script src="contenu.enc.js"></script>
 <script src="chat-core.js"></script>
 <script src="script.js"></script>
+<script src="notif.js"></script>
 <script src="nuit.js"></script>
 </body>
 </html>
