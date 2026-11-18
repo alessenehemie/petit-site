@@ -78,7 +78,10 @@
       panel.querySelectorAll('.chat-sw').forEach(b => b.classList.toggle('on', b.dataset.wp === id));
       return id;
     }
-    function chooseWp(id) { id = applyWp(id); try { localStorage.setItem(wpKey, id); } catch (e) {} }
+    function chooseWp(id) { 
+      id = applyWp(id); 
+      try { localStorage.setItem(wpKey, id); } catch (e) {} 
+    }
     WP.forEach(([id, label]) => { sw(id, label).onclick = () => chooseWp(id); });
     const bMy = sw('photo', 'Ma photo', 'chat-swphoto'), bNew = sw('new', '📷 Ajouter', 'chat-swnew');
     bMy.onclick = () => chooseWp('photo');
@@ -96,7 +99,9 @@
       } catch (e) { say('❌ Cette photo n’a pas pu être gardée comme fond.'); }
     };
     bWp.onclick = () => { panel.hidden = !panel.hidden; };
-    showMy(); applyWp(lsGet(wpKey) || 'doux');
+    showMy(); 
+    const savedWp = lsGet(wpKey) || 'doux';
+    applyWp(savedWp);
 
     const editBar = el('div', 'chat-edit'); editBar.hidden = true;
     const editT = el('span', '', '✏️ Modification du message'), editX = el('button', 'chat-ico', '✕'); editX.title = 'Annuler la modification';
@@ -505,8 +510,14 @@
       if (!navigator.mediaDevices || !window.MediaRecorder) { say('❌ Les vocaux ne sont pas pris en charge sur cet appareil ou ce navigateur.'); return; }
       try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
       catch (e) { say('❌ Micro refusé : autorise le micro dans ton navigateur.', 9000); return; }
-      const mt = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t)) || '';
-      rec = new MediaRecorder(recStream, mt ? { mimeType: mt } : {}); recChunks = [];
+      // Support universel optimisé mobile (iOS/Android)
+      const mt = ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+      try {
+        rec = new MediaRecorder(recStream, mt ? { mimeType: mt } : {});
+      } catch (e) {
+        rec = new MediaRecorder(recStream);
+      }
+      recChunks = [];
       rec.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
       rec.start(); recT0 = Date.now(); bar.hidden = true; recBar.hidden = false; recT.textContent = '🔴 0:00';
       recTick = setInterval(() => { const s = (Date.now() - recT0) / 1000; recT.textContent = '🔴 ' + mmss(s); if (s >= MAX_REC) finishRec(true); }, 250);
