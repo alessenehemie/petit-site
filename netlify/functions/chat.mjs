@@ -4,7 +4,7 @@
 //   POST   /api/chat              envoie un message : {enc:{iv,data}, mid?, parts?}
 //   DELETE /api/chat?id=<id>      supprime un message (Soraya : les siens ; admin : tous)
 import { store, json, roleChat } from '../lib/common.mjs';
-import { notifierSoraya } from '../lib/push.mjs';
+import { notifierSoraya, notifierAdmin } from '../lib/push.mjs';
 
 const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
 const ID = /^[0-9]{15}-[a-z0-9]{1,8}$/;
@@ -49,6 +49,9 @@ export default async (req) => {
     const id = String(rec.t).padStart(15, '0') + '-' + Math.random().toString(36).slice(2, 7);
     await s.setJSON('chat/' + id, rec);
     // Message de Nissi : on prévient Soraya (texte volontairement neutre, le contenu reste chiffré).
+    if (role === 'soraya') {
+      try { await Promise.race([notifierAdmin({ title: 'Soraya 💗', body: 'Nouveau message de Soraya 💬', url: '/admin.html' }), new Promise(r => setTimeout(r, 4000))]); } catch (_) {}
+    }
     if (role === 'admin') {
       try { await Promise.race([notifierSoraya({ title: 'Nissi 💗', body: 'Tu as un nouveau message 💬', url: '/' }), new Promise(r => setTimeout(r, 4000))]); } catch (_) {}
     }

@@ -41,6 +41,7 @@
   </header>
 
   <section id="tab-discussion" class="tab" hidden>
+    <p><button type="button" id="btnNotifAdmin" onclick="activerNotifsAdmin()">🔔 Me prévenir quand Soraya m'écrit</button></p>
     <p class="help" id="chatWait">Activation de la discussion en cours… (si ce message reste, clique sur « Publier » en bas, dans un autre onglet).</p>
     <div id="adminChat"></div>
     <p class="help">Messages, photos, vidéos (40 Mo max) et vocaux sont chiffrés : seuls toi et Soraya pouvez les lire. Supprimer un message le supprime pour vous deux.</p>
@@ -110,5 +111,6 @@
 <script src="contenu.enc.js"></script>
 <script src="chat-core.js"></script>
 <script src="admin.js"></script>
+<script src="admin-notif.js"></script>
 </body>
 </html>

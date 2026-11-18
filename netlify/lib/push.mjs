@@ -1,4 +1,4 @@
-// Notifications push pour Soraya. Les clés VAPID sont créées automatiquement au premier usage.
+// Notifications push (Soraya et Nissi). Les clés VAPID sont créées automatiquement au premier usage.
 import webpush from 'web-push';
 import { store } from './common.mjs';
 
@@ -9,10 +9,10 @@ export async function cles(origin) {
   return v;
 }
 
-export async function notifierSoraya(payload) {
+async function envoyer(cle, payload) {
   const s = store();
   const v = await s.get('push-vapid', { type: 'json' });
-  const ab = (await s.get('push-soraya', { type: 'json' })) || [];
+  const ab = (await s.get(cle, { type: 'json' })) || [];
   if (!v || !ab.length) return 0;
   webpush.setVapidDetails(v.sujet, v.pub, v.priv);
   const gardes = []; let n = 0;
@@ -20,6 +20,8 @@ export async function notifierSoraya(payload) {
     try { await webpush.sendNotification(sub, JSON.stringify(payload), { TTL: 86400 }); gardes.push(sub); n++; }
     catch (e) { if (e.statusCode !== 404 && e.statusCode !== 410) gardes.push(sub); }
   }));
-  if (gardes.length !== ab.length) await s.setJSON('push-soraya', gardes);
+  if (gardes.length !== ab.length) await s.setJSON(cle, gardes);
   return n;
 }
+export const notifierSoraya = payload => envoyer('push-soraya', payload);
+export const notifierAdmin = payload => envoyer('push-admin', payload);
