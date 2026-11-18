@@ -1,1 +1,9 @@
-{ "name": "soraya", "private": true, "dependencies": { "@netlify/blobs": "^8.1.0" } }
+{
+  "name": "pour-soraya",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Site pour Soraya avec partie administrateur (Netlify Functions + Blobs)",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

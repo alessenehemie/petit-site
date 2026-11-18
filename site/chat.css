@@ -1,0 +1,53 @@
+/* ===== Discussion (site de Soraya + page admin) ===== */
+:root{--chat-other:rgba(255,255,255,.92);--chat-line:rgba(214,36,110,.22)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--chat-other:rgba(255,255,255,.1);--chat-line:rgba(255,255,255,.18)}}
+:root[data-theme="dark"]{--chat-other:rgba(255,255,255,.1);--chat-line:rgba(255,255,255,.18)}
+
+.chat{display:flex;flex-direction:column;text-align:left;margin:8px 0}
+.chat-list{height:52vh;min-height:220px;overflow-y:auto;padding:10px 6px;border-radius:18px;background:var(--paper,rgba(255,240,247,.6));border:1px solid var(--chat-line);scrollbar-width:thin;scrollbar-color:var(--accent) transparent}
+.chat-empty{text-align:center;opacity:.7;padding:40px 12px;font-style:italic}
+.chat-day{text-align:center;font-size:.78rem;opacity:.7;margin:12px 0 6px;text-transform:capitalize}
+.chat-row{display:flex;margin:4px 0}
+.chat-row.me{justify-content:flex-end}
+.chat-b{max-width:82%;padding:8px 12px 5px;border-radius:18px;line-height:1.45;word-wrap:break-word;overflow-wrap:anywhere;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.chat-row.me .chat-b{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-bottom-right-radius:6px}
+.chat-row.them .chat-b{background:var(--chat-other);color:var(--txt);border-bottom-left-radius:6px}
+.chat-b p{margin:0;white-space:pre-wrap;font-size:1rem}
+.chat-lock{opacity:.7;font-style:italic}
+.chat-meta{display:flex;gap:8px;justify-content:flex-end;align-items:center;font-size:.7rem;opacity:.75;margin-top:2px}
+.chat-media{min-width:120px}
+.chat-media img,.chat-media video{display:block;max-width:100%;max-height:300px;border-radius:12px;cursor:pointer}
+.chat-media audio{display:block;width:230px;max-width:100%}
+.chat-info{min-height:1.5em;font-size:.88rem;padding:4px 8px}
+
+/* Barre d'écriture (surcharge les styles globaux des boutons/champs) */
+.chat-bar,.chat-rec{display:flex;gap:6px;align-items:flex-end;margin-top:6px}
+.chat-rec{align-items:center;justify-content:space-between;padding:4px 2px}
+.chat-rect{font-weight:700;font-variant-numeric:tabular-nums}
+.chat-bar[hidden],.chat-rec[hidden]{display:none}
+.chat .chat-input{font-family:inherit;flex:1;min-width:0;margin:0;padding:10px 14px;border-radius:20px;border:1.5px solid var(--accent);background:var(--card,#fff);color:var(--txt);font-size:1rem;line-height:1.4;resize:none;max-height:120px;letter-spacing:0;text-align:left;box-shadow:none;transform:none}
+.chat .chat-input:focus{transform:none;box-shadow:0 0 0 3px var(--chat-line)}
+.chat button{width:auto;max-width:none;margin:0}
+.chat button::after{display:none}
+.chat button:hover{transform:none}
+.chat .chat-ico,.chat .chat-send{flex:none;width:42px;height:42px;padding:0;border-radius:50%;font-size:1.15rem;line-height:1;display:grid;place-items:center}
+.chat .chat-ico{background:var(--card,#fff);color:var(--txt);border:1.5px solid var(--chat-line);box-shadow:none;text-shadow:none}
+.chat .chat-send{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:0}
+.chat button:disabled{opacity:.5;cursor:not-allowed}
+.chat .chat-del{padding:0 2px;width:auto;height:auto;background:none;border:0;box-shadow:none;font-size:.8rem;opacity:.6;color:inherit;text-shadow:none;cursor:pointer}
+.chat .chat-del:hover{opacity:1}
+.chat .chat-load{padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.2);border:1.5px solid currentColor;color:inherit;font-size:.95rem;box-shadow:none;text-shadow:none}
+.chat-lb{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.88);display:grid;place-items:center;cursor:zoom-out;padding:12px}
+.chat-lb img{max-width:100%;max-height:100%;border-radius:8px}
+
+/* Bouton 💬 du site, à côté du thème */
+#chatBtn{right:58px}
+#musicBtn{right:106px}
+#chatBtn .badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#e11d48;color:#fff;font-size:.7rem;line-height:18px;font-weight:700;text-shadow:none}
+#chatBtn .badge[hidden]{display:none}
+#sChat .chat-list{height:46vh}
+#chatBtn{overflow:visible}
+.card#sChat.on{animation:pop .8s cubic-bezier(.2,1.4,.4,1)}   /* pas de flottement pendant qu'on écrit */
+
+/* Admin : la liste occupe la hauteur disponible */
+#tab-discussion .chat-list{height:calc(100vh - 300px);min-height:240px}

@@ -32,6 +32,7 @@
 
     const idx = dayIndexNuit();
     ecrire(el, MESSAGES_NUIT[idx]);
+    if (typeof suivre === 'function') suivre('night', idx);
   }
 
   window.showNight = function () {

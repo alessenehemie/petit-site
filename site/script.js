@@ -6,8 +6,9 @@ const INDICE = "Indice 💡 : pense à ton petit surnom doux, à ce qu'on se dit
 
 // ===== Contenu secret =====
 // Les messages, les lettres « Ouvre quand… », « Notre histoire » et le numéro WhatsApp ne sont PLUS écrits ici :
-// ils sont chiffrés dans contenu.enc.js et se déverrouillent avec le code secret (voir textes.js et chiffrer.js).
-let MESSAGES = [], MESSAGES_NUIT = [], LETTRES = [], CUSTOM_MOMENTS = [], WHATSAPP_NUMBER = '';
+// ils sont chiffrés et se déverrouillent avec le code secret. Ils sont lus en priorité depuis le serveur (/api/content,
+// publié depuis la page admin.html), et à défaut depuis le fichier contenu.enc.js.
+let MESSAGES = [], MESSAGES_NUIT = [], LETTRES = [], CUSTOM_MOMENTS = [], WHATSAPP_NUMBER = '', CHAT_KEY = '';
 
 // ===== Navigation entre les étapes =====
 const $ = id => document.getElementById(id);
@@ -41,9 +42,27 @@ function isSoraya(oui){ go(oui ? 's2' : 'sNo'); }
 // ===== Déverrouillage du contenu chiffré =====
 // Le code secret sert de clé : PBKDF2 (200 000 tours) puis AES-GCM. Un mauvais code fait échouer le déchiffrement.
 const deB64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
+// Contenu chiffré : d'abord celui publié depuis l'administration, sinon le fichier contenu.enc.js livré avec le site.
+async function chargerChiffre(){
+  try {
+    const r = await fetch('/api/content', {cache: 'no-store'});
+    if (r.ok){ const C = await r.json(); if (C && C.salt && C.iv && C.data && C.iter) return C; }
+  } catch(e){}
+  if (typeof CONTENU_CHIFFRE !== 'undefined') return CONTENU_CHIFFRE;
+  throw new Error('nocontent');
+}
+// Petit compteur d'activité pour la page admin (aucun texte n'est envoyé : seulement un type et un numéro).
+function suivre(type, i, on){
+  try {
+    const b = {type};
+    if (Number.isInteger(i)) b.i = i;
+    if (typeof on === 'boolean') b.on = on;
+    fetch('/api/track', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(b), keepalive: true}).catch(() => {});
+  } catch(e){}
+}
 async function ouvrirContenu(code){
   if (!(window.crypto && crypto.subtle)) throw new Error('nocrypto');
-  const C = CONTENU_CHIFFRE;
+  const C = await chargerChiffre();
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
   const cle = await crypto.subtle.deriveKey({name:'PBKDF2', salt:deB64(C.salt), iterations:C.iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
   const clair = await crypto.subtle.decrypt({name:'AES-GCM', iv:deB64(C.iv)}, cle, deB64(C.data));
@@ -53,7 +72,37 @@ function appliquerContenu(d){
   MESSAGES = d.messages; MESSAGES_NUIT = d.nuit; LETTRES = d.lettres;
   CUSTOM_MOMENTS = d.moments || []; WHATSAPP_NUMBER = d.whatsapp || '';
   $('wa').hidden = !WHATSAPP_NUMBER;
+  CHAT_KEY = d.chatKey || '';
+  $('chatBtn').hidden = !CHAT_KEY;
+  initChat();
+  suivre('visit');
 }
+
+// ===== Discussion avec Nissi =====
+// Messages, photos, vidéos et vocaux sont chiffrés ici même (clé de chat contenue dans le contenu déverrouillé par le code).
+let chat = null, chatFrom = 's3', chatInit = false;
+async function initChat(){
+  if (!CHAT_KEY || chatInit) return;
+  chatInit = true;
+  try {
+    const tok = await ChatUI.token(CHAT_KEY);
+    chat = ChatUI({
+      box: $('chatBox'), keyB64: CHAT_KEY, me: 'soraya',
+      headers: () => ({'x-chat-token': tok}),
+      isActive: () => cur === 'sChat',
+      onUnread: n => { const b = $('chatBadge'); b.textContent = n > 9 ? '9+' : n; b.hidden = !n; }
+    });
+    chat.start();
+  } catch(e){ chatInit = false; }
+}
+async function showChat(){
+  if (!CHAT_KEY) return;
+  await initChat();
+  if (!chat) return;
+  if (cur !== 'sChat') chatFrom = cur;
+  go('sChat', () => chat.opened());
+}
+function closeChat(){ go(chatFrom && chatFrom !== 'sChat' ? chatFrom : 's3'); }
 
 // Étape 2 : le code
 $('code').addEventListener('keydown', e => { if(e.key === 'Enter') checkCode(); });
@@ -63,17 +112,19 @@ async function checkCode(){
   if(!v){ $('err').textContent = 'Entre le code, mon cœur 💗'; shake(); return; }
   if (enCours) return;
   enCours = true; $('err').textContent = 'Un instant… 💗';
-  let d = null, nocrypto = false;
+  let d = null, raison = '';
   try { d = await ouvrirContenu(v); }
-  catch(e){ nocrypto = !!(e && e.message === 'nocrypto'); }
+  catch(e){ raison = (e && e.message) || ''; }
   enCours = false;
   if (d){
     appliquerContenu(d);
     try { localStorage.setItem('codeSecret', v); } catch(e){}   // pour ne pas retaper le code sur cet appareil
     $('err').textContent = ''; $('hint').textContent = ''; echecs = 0;
     go('s3'); burst();
-  } else if (nocrypto){
+  } else if (raison === 'nocrypto'){
     $('err').textContent = "Ce site doit être ouvert en https pour s'ouvrir 💗";
+  } else if (raison === 'nocontent'){
+    $('err').textContent = "Le contenu est introuvable pour l'instant, réessaie un peu plus tard 💗";
   } else {
     echecs++;
     $('err').textContent = 'Code incorrect 💔 Réessaie…';
@@ -92,7 +143,7 @@ async function checkCode(){
     appliquerContenu(await ouvrirContenu(saved));
     $('s3').classList.add('on'); cur = 's3';
   } catch(e){
-    if (!(e && e.message === 'nocrypto')) { try { localStorage.removeItem('codeSecret'); } catch(x){} }
+    if (!(e && (e.message === 'nocrypto' || e.message === 'nocontent'))) { try { localStorage.removeItem('codeSecret'); } catch(x){} }
     $('s1').classList.add('on');
   }
 })();
@@ -105,6 +156,7 @@ function said(oui){ go(oui ? 'sYes' : 'sNon'); }
 const START_DATE = Date.UTC(2026, 9, 15); // 15 octobre 2026 (mois : 0 = janvier)
 // Date de début de votre couple : 26 décembre 2025 (sert au compteur de jours et aux anniversaires du 26)
 const COUPLE_DATE = Date.UTC(2025, 11, 26);
+let curIdx = 0;   // numéro (à partir de 0) du message du jour affiché
 function dayIndex(){
   const d = new Date();
   return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - START_DATE) / 86400000);
@@ -121,6 +173,7 @@ function showMsg(){
       ? `🎉 Joyeux anniversaire à nous ! Déjà ${mois/12} an${mois/12 > 1 ? 's' : ''} ensemble 💍\n\n`
       : `🎉 Aujourd'hui, ça fait ${mois} mois qu'on est ensemble, mon amour !\n\n`;
   }
+  curIdx = i;
   curText = bonus + MESSAGES[i];
   $('date').textContent = t.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'}) + (jours > 0 ? ' · ensemble depuis ' + jours + ' jours 💗' : '');
   $('env').classList.remove('open'); $('hello').textContent = HELLO[skyKind()]; setSky();
@@ -130,6 +183,7 @@ function showMsg(){
 
 // Étape finale : aime-t-elle le message ?
 function liked(oui){
+  suivre('like', curIdx, !!oui);
   if(oui){ buildBouquet(); go('sBq'); burst(40); heartBoom(); }
   else go('sSad');
 }
@@ -243,6 +297,7 @@ async function copyMsg(btn){
   const old = btn.textContent; btn.textContent = 'Copié ✅'; setTimeout(() => btn.textContent = old, 2000);
 }
 function sendKiss(){
+  suivre('kiss');
   open('https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent("Je viens de lire mon message du jour 🥰 Je t'aime Nissi 💗😘"), '_blank');
 }
 if (MUSIC_FILE){
@@ -274,7 +329,7 @@ function showHistory(){
     s.textContent = (f.includes(k) ? '❤️ ' : '') + 'Jour ' + (k + 1) + ' · ' + new Date(START_DATE + k * 86400000).toLocaleDateString('fr-FR', {day:'numeric', month:'long', timeZone:'UTC'});
     p.className = 'hm'; p.textContent = MESSAGES[k];
     h.className = 'alt small'; h.textContent = f.includes(k) ? 'Retirer des coups de cœur' : 'Coup de cœur ❤️';
-    h.onclick = () => { const g = favs(), x = g.indexOf(k); x < 0 ? g.push(k) : g.splice(x, 1); setFavs(g); showHistory(); };
+    h.onclick = () => { const g = favs(), x = g.indexOf(k); x < 0 ? g.push(k) : g.splice(x, 1); setFavs(g); suivre('fav', k, x < 0); showHistory(); };
     d.append(s, p, h); box.appendChild(d);
   }
   if (!box.children.length) box.textContent = onlyFav ? 'Aucun coup de cœur pour le moment 💗' : 'Pas encore de messages passés 💗';
@@ -287,7 +342,7 @@ function toggleFav(){ onlyFav = !onlyFav; showHistory(); }
 // ===== Enveloppe =====
 function openEnv(){
   const e = $('env'); if (e.classList.contains('open')) return;
-  e.classList.add('open'); heartBoom();
+  e.classList.add('open'); heartBoom(); suivre('open', curIdx);
   heartbeat();
   setTimeout(() => go('s4', () => { prepareScratch(); burst(); }), 1900);
 }
@@ -370,9 +425,9 @@ function reveal(){
 // (les lettres sont dans le contenu chiffré : voir textes.js)
 function showOpen(){
   const l = $('openList');
-  if (!l.children.length) LETTRES.forEach(x => {
+  if (!l.children.length) LETTRES.forEach((x, n) => {
     const b = document.createElement('button'); b.className = 'alt'; b.textContent = x.t;
-    b.onclick = () => { const m = $('openText'); m.hidden = false; ecrire(m, x.m); m.scrollTop = 0; burst(12); };
+    b.onclick = () => { suivre('letter', n); const m = $('openText'); m.hidden = false; ecrire(m, x.m); m.scrollTop = 0; burst(12); };
     l.appendChild(b);
   });
   $('openText').hidden = true; go('sOpen');

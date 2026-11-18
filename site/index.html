@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Lora:ital,wght@0,500;0,600;1,500&family=Quicksand:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="chat.css">
 </head>
 <body>
 <div id="sky"></div>
@@ -16,6 +17,7 @@
 <div id="boom"></div>
 <button id="theme" class="icon" aria-label="Changer de thème : clair ou sombre">🌙</button>
 <button id="musicBtn" class="icon" aria-label="Activer ou couper la musique" hidden>🎵</button>
+<button id="chatBtn" class="icon" aria-label="Discuter avec Nissi" onclick="showChat()" hidden>💬<span class="badge" id="chatBadge" hidden></span></button>
 <audio id="music" loop></audio>
 
 <!-- Étape 1 : Êtes-vous Soraya ? -->
@@ -69,6 +71,9 @@
 
 <section class="card" id="sSad"><div class="big">🥺</div><h1>Oh…</h1><p>Il en écrira un encore plus beau demain. Il t'aime de tout son cœur, quoi qu'il arrive 💗</p><button onclick="go('s4')">Relire le message</button></section>
 
+<!-- Discussion avec Nissi -->
+<section class="card" id="sChat"><h1>Nous deux 💬</h1><div id="chatBox"></div><button class="alt small" onclick="closeChat()">Retour 🌸</button></section>
+
 <!-- Messages précédents -->
 <section class="card" id="sHist"><h1>Mes messages 📖</h1><div id="histList" class="hist"></div>
 <button class="alt" id="favBtn" onclick="toggleFav()">Voir mes ❤️</button><button onclick="go('s4')">Retour 💌</button></section>
@@ -84,9 +89,9 @@
 <button class="alt" onclick="copyNight(this)">Copier le message 📋</button>
 <button onclick="go('s4')">Retour 💌</button></section>
 
-<script src="/.netlify/functions/api?a=contenu.js" onerror="var x=document.createElement('script');x.src='contenu.enc.js';document.head.appendChild(x)"></script>
+<script src="contenu.enc.js"></script>
+<script src="chat-core.js"></script>
 <script src="script.js"></script>
 <script src="nuit.js"></script>
-<script src="suivi.js"></script>
 </body>
 </html>
