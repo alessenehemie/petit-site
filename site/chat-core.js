@@ -40,7 +40,44 @@
     const recT = el('span', 'chat-rect', '🔴 0:00'), recX = el('button', 'chat-ico', '✕'), recOk = el('button', 'chat-send', '➤');
     recX.title = 'Annuler'; recOk.title = 'Envoyer le vocal';
     recBar.append(recX, recT, recOk);
-    root.append(list, info, bar, recBar);
+    // --- Fond d'écran (choisi sur cet appareil, rien n'est envoyé au serveur) ---
+    const WP = [['doux', 'Doux'], ['nuit', 'Nuit'], ['coeurs', 'Cœurs'], ['ciel', 'Ciel'], ['coucher', 'Coucher'], ['rouge', 'Rouge'], ['noir', 'Noir']];
+    const wpKey = 'chatWp:' + o.me, wpImgKey = 'chatWpImg:' + o.me;
+    const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const top = el('div', 'chat-top'), bWp = el('button', 'chat-wpbtn', '🎨 Fond d’écran');
+    const panel = el('div', 'chat-wp'); panel.hidden = true;
+    const wpFile = el('input'); wpFile.type = 'file'; wpFile.accept = 'image/*'; wpFile.hidden = true;
+    top.append(bWp, wpFile);
+    const sw = (id, label, extra) => { const b = el('button', 'chat-sw ' + (extra || 'wp-' + id)); b.dataset.wp = id; b.title = label; b.setAttribute('aria-label', 'Fond ' + label); b.appendChild(el('span', '', label)); panel.appendChild(b); return b; };
+    function applyWp(id) {
+      const img = id === 'photo' ? lsGet(wpImgKey) : null;
+      if (id === 'photo' && !img) id = 'doux';
+      list.className = 'chat-list wp-' + id;
+      list.style.backgroundImage = img ? 'url("' + img + '")' : '';
+      panel.querySelectorAll('.chat-sw').forEach(b => b.classList.toggle('on', b.dataset.wp === id));
+      return id;
+    }
+    function chooseWp(id) { id = applyWp(id); try { localStorage.setItem(wpKey, id); } catch (e) {} }
+    WP.forEach(([id, label]) => { sw(id, label).onclick = () => chooseWp(id); });
+    const bMy = sw('photo', 'Ma photo', 'chat-swphoto'), bNew = sw('new', '📷 Ajouter', 'chat-swnew');
+    bMy.onclick = () => chooseWp('photo');
+    bNew.onclick = () => wpFile.click();
+    function showMy() { const im = lsGet(wpImgKey); bMy.hidden = !im; bMy.style.backgroundImage = im ? 'url("' + im + '")' : ''; }
+    wpFile.onchange = async () => {
+      const f = wpFile.files[0]; wpFile.value = ''; if (!f) return;
+      if (!f.type.startsWith('image/')) { say('❌ Choisis une image.'); return; }
+      try {
+        const bmp = await createImageBitmap(f), sc = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas'); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        localStorage.setItem(wpImgKey, c.toDataURL('image/jpeg', 0.7));
+        showMy(); chooseWp('photo');
+      } catch (e) { say('❌ Cette photo n’a pas pu être gardée comme fond.'); }
+    };
+    bWp.onclick = () => { panel.hidden = !panel.hidden; };
+    showMy(); applyWp(lsGet(wpKey) || 'doux');
+
+    root.append(top, panel, list, info, bar, recBar);
 
     const keyP = crypto.subtle.importKey('raw', unb64(o.keyB64), 'AES-GCM', false, ['encrypt', 'decrypt']);
     const shown = new Map(), blobs = new Map();
