@@ -77,11 +77,15 @@
     bWp.onclick = () => { panel.hidden = !panel.hidden; };
     showMy(); applyWp(lsGet(wpKey) || 'doux');
 
-    root.append(top, panel, list, info, bar, recBar);
+    const editBar = el('div', 'chat-edit'); editBar.hidden = true;
+    const editT = el('span', '', '✏️ Modification du message'), editX = el('button', 'chat-ico', '✕'); editX.title = 'Annuler la modification';
+    editBar.append(editT, editX);
+    root.append(top, panel, list, info, editBar, bar, recBar);
 
     const keyP = crypto.subtle.importKey('raw', unb64(o.keyB64), 'AES-GCM', false, ['encrypt', 'decrypt']);
     const shown = new Map(), blobs = new Map();
     let lastId = '', lastDay = '', busy = false, started = false, timer = 0, infoT = 0, sending = 0;
+    let hidden = new Set(), lu = {}, lastMaj = null, lastRead = '', editing = '';
     const seenKey = 'chatSeen:' + o.me;
     const H = (extra) => Object.assign({}, o.headers(), extra || {});
 
@@ -150,56 +154,119 @@
     // --- Affichage ---
     const nearBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 120;
     const toBottom = () => { list.scrollTop = list.scrollHeight; };
-    async function add(m) {
-      const mine = m.from === o.me, row = el('div', 'chat-row ' + (mine ? 'me' : 'them')), b = el('div', 'chat-b');
-      let obj = null;
-      try { obj = await decObj(m.enc); } catch (e) {}
-      if (!obj) b.appendChild(el('p', 'chat-lock', '🔒 Message illisible'));
-      else if (obj.k === 'text') b.appendChild(el('p', '', String(obj.x)));
-      else if (m.mid && (obj.k === 'image' || obj.k === 'video' || obj.k === 'audio')) b.appendChild(mediaNode(m, obj));
-      else b.appendChild(el('p', 'chat-lock', '🔒 Message non pris en charge'));
-      const meta = el('div', 'chat-meta');
-      const d = new Date(m.t), day = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-      if (day !== lastDay) { lastDay = day; list.appendChild(el('div', 'chat-day', day)); }
-      meta.appendChild(el('span', '', d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
-      if (mine || o.me === 'admin') {
-        const del = el('button', 'chat-del', '🗑'); del.title = 'Supprimer'; del.setAttribute('aria-label', 'Supprimer ce message');
-        del.onclick = async () => {
-          if (!confirm('Supprimer ce message pour vous deux ?')) return;
-          try { await api('/api/chat?id=' + m.id, { method: 'DELETE' }); row.remove(); shown.delete(m.id); count(); }
-          catch (e) { say('❌ ' + e.message); }
-        };
-        meta.appendChild(del);
-      }
-      b.appendChild(meta); row.appendChild(b); list.appendChild(row);
-      shown.set(m.id, { node: row, from: m.from });
+    const other = o.me === 'admin' ? 'soraya' : 'admin';
+    let menuEl = null;
+    const closeMenu = () => { if (menuEl) { menuEl.remove(); menuEl = null; } };
+    document.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+    list.addEventListener('scroll', closeMenu);
+
+    // Coches : ✓ envoyé, ✓✓ (bleu) lu par l'autre personne.
+    function refreshTicks() {
+      shown.forEach((v, id) => {
+        if (!v.tick) return;
+        const r = !!(lu[other] && lu[other] >= id);
+        v.tick.textContent = r ? '✓✓' : '✓'; v.tick.classList.toggle('lu', r); v.tick.title = r ? 'Lu' : 'Envoyé';
+      });
     }
+
+    async function fill(row, m) {
+      row.textContent = '';
+      const b = el('div', 'chat-b'); let obj = null;
+      if (m.deleted) { b.classList.add('chat-gone'); b.appendChild(el('p', '', '🚫 Message supprimé')); }
+      else {
+        try { obj = await decObj(m.enc); } catch (e) {}
+        if (!obj) b.appendChild(el('p', 'chat-lock', '🔒 Message illisible'));
+        else if (obj.k === 'text') b.appendChild(el('p', '', String(obj.x)));
+        else if (m.mid && (obj.k === 'image' || obj.k === 'video' || obj.k === 'audio')) b.appendChild(mediaNode(m, obj));
+        else b.appendChild(el('p', 'chat-lock', '🔒 Message non pris en charge'));
+      }
+      const meta = el('div', 'chat-meta'), d = new Date(m.t);
+      meta.appendChild(el('span', '', (m.edited && !m.deleted ? 'modifié · ' : '') + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })));
+      let tick = null;
+      if (m.from === o.me && !m.deleted) { tick = el('span', 'chat-tick', '✓'); meta.appendChild(tick); }
+      const more = el('button', 'chat-more', '⋯'); more.title = 'Options'; more.setAttribute('aria-label', 'Options du message');
+      more.onclick = ev => { ev.stopPropagation(); showMenu(more, m, obj); };
+      meta.appendChild(more);
+      b.appendChild(meta); row.appendChild(b);
+      return tick;
+    }
+    async function refill(entry, m) { entry.tick = await fill(entry.node, m); entry.deleted = !!m.deleted; refreshTicks(); }
+    async function add(m) {
+      const row = el('div', 'chat-row ' + (m.from === o.me ? 'me' : 'them'));
+      const day = new Date(m.t).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (day !== lastDay) { lastDay = day; list.appendChild(el('div', 'chat-day', day)); }
+      const entry = { node: row, from: m.from, id: m.id, tick: null, deleted: !!m.deleted };
+      shown.set(m.id, entry); list.appendChild(row);
+      await refill(entry, m);
+    }
+
+    // Menu d'un message : copier, modifier, supprimer pour moi / pour tous.
+    function showMenu(btn, m, obj) {
+      closeMenu();
+      const mine = m.from === o.me, mn = el('div', 'chat-menu');
+      const item = (label, fn) => { const b = el('button', '', label); b.onclick = ev => { ev.stopPropagation(); closeMenu(); fn(); }; mn.appendChild(b); };
+      const isText = !m.deleted && obj && obj.k === 'text';
+      if (isText) item('📋 Copier', () => copyText(String(obj.x)));
+      if (isText && mine) item('✏️ Modifier', () => startEdit(m.id, String(obj.x)));
+      item('🗑 Supprimer pour moi', () => hideMsg(m.id));
+      if (!m.deleted && (mine || o.me === 'admin')) item('🗑 Supprimer pour tous', () => delAll(m.id));
+      document.body.appendChild(mn);
+      const r = btn.getBoundingClientRect(), w = mn.offsetWidth, h = mn.offsetHeight;
+      mn.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+      mn.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6) + 'px';
+      menuEl = mn;
+    }
+    async function copyText(t) { try { await navigator.clipboard.writeText(t); say('📋 Copié', 2000); } catch (e) { say('❌ Copie impossible.'); } }
+    async function hideMsg(id) {
+      try {
+        await api('/api/chat?op=hide&id=' + id, { method: 'PUT' });
+        hidden.add(id); const v = shown.get(id); if (v) { v.node.remove(); shown.delete(id); } count();
+      } catch (e) { say('❌ ' + e.message); }
+    }
+    async function delAll(id) {
+      if (!confirm('Supprimer ce message pour vous deux ?')) return;
+      try { await api('/api/chat?id=' + id, { method: 'DELETE' }); await poll(); }
+      catch (e) { say('❌ ' + e.message); }
+    }
+    function startEdit(id, text) { editing = id; txt.value = text; grow(); editBar.hidden = false; bSend.textContent = '✓'; txt.focus(); }
+    function cancelEdit() { editing = ''; txt.value = ''; grow(); editBar.hidden = true; bSend.textContent = '➤'; }
+    editX.onclick = cancelEdit;
 
     // --- Non lus ---
     const seen = () => { try { return localStorage.getItem(seenKey) || ''; } catch (e) { return ''; } };
     const active = () => o.isActive() && !document.hidden;
+    function marquerLu(id) {
+      if (id > lastRead) { const prev = lastRead; lastRead = id; api('/api/chat?op=read&id=' + id, { method: 'PUT' }).catch(() => { lastRead = prev; }); }
+    }
     function count() {
       let last = '', n = 0; const s = seen();
-      shown.forEach((v, id) => { if (v.from !== o.me) { if (id > last) last = id; if (id > s) n++; } });
-      if (active() && last) { try { localStorage.setItem(seenKey, last); } catch (e) {} n = 0; }
+      shown.forEach((v, id) => { if (v.from !== o.me && !v.deleted) { if (id > last) last = id; if (id > s) n++; } });
+      if (active() && last) { try { localStorage.setItem(seenKey, last); } catch (e) {} n = 0; marquerLu(last); }
       if (o.onUnread) o.onUnread(n);
     }
 
     async function poll() {
       if (busy) return; busy = true;
       try {
-        const r = await api('/api/chat' + (lastId ? '?after=' + lastId : ''));
+        const qs = []; if (lastId) qs.push('after=' + lastId); if (lastMaj !== null) qs.push('maj=' + lastMaj);
+        const r = await api('/api/chat' + (qs.length ? '?' + qs.join('&') : ''));
         const wasBottom = nearBottom() || !shown.size;
+        hidden = new Set(r.cache || []); lu = r.lu || {};
+        if (lu[o.me] && lu[o.me] > lastRead) lastRead = lu[o.me];
         if (r.ids.length) {
           const set = new Set(r.ids), first = r.ids[0];
-          shown.forEach((v, id) => { if (id >= first && !set.has(id)) { v.node.remove(); shown.delete(id); } });
+          shown.forEach((v, id) => { if ((id >= first && !set.has(id)) || hidden.has(id)) { v.node.remove(); shown.delete(id); } });
         }
+        for (const u of (r.updates || [])) { const v = shown.get(u.id); if (v) await refill(v, u); }
+        lastMaj = Math.max(lastMaj || 0, r.maj || 0);
         let mineNew = false;
         for (const m of r.messages) {
           if (m.id > lastId) lastId = m.id;
-          if (shown.has(m.id)) continue;
+          if (shown.has(m.id) || hidden.has(m.id)) continue;
           await add(m); if (m.from === o.me) mineNew = true;
         }
+        refreshTicks();
         if (r.messages.length && (wasBottom || mineNew)) toBottom();
         if (!shown.size && !list.querySelector('.chat-empty')) list.appendChild(el('div', 'chat-empty', 'Aucun message pour le moment. Écris le premier 💗'));
         else if (shown.size) { const e = list.querySelector('.chat-empty'); if (e) e.remove(); }
@@ -250,6 +317,14 @@
     }
     async function sendText() {
       const t = txt.value.trim(); if (!t || sending) return;
+      if (editing) {
+        const id = editing;
+        try {
+          await api('/api/chat?op=edit&id=' + id, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ enc: await encObj({ k: 'text', x: t }) }) });
+          cancelEdit(); await poll();
+        } catch (e) { say('❌ ' + e.message); }
+        return;
+      }
       txt.value = ''; grow();
       try { await post({ k: 'text', x: t }); } catch (e) { txt.value = t; grow(); say('❌ Non envoyé : ' + e.message); }
     }
