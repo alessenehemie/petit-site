@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pour Soraya 💗</title>
+<meta name="theme-color" content="#ff9ec7">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&family=Lora:ital,wght@0,500;0,600;1,500&family=Quicksand:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="sky"></div>
+<div id="fx"></div>
+<div id="boom"></div>
+<button id="theme" class="icon" aria-label="Changer de thème : clair ou sombre">🌙</button>
+<button id="musicBtn" class="icon" aria-label="Activer ou couper la musique" hidden>🎵</button>
+<audio id="music" loop></audio>
+
+<!-- Étape 1 : Êtes-vous Soraya ? -->
+<section class="card on" id="s1"><div class="big">💖</div><h1>Coucou toi…</h1><p>Un petit quelque chose t'attend 🌸<br><b>Êtes-vous Soraya ?</b></p>
+<button onclick="isSoraya(true)">Oui 💕</button><button class="alt" onclick="isSoraya(false)">Non</button></section>
+
+<!-- Refus -->
+<section class="card" id="sNo"><div class="big">🔒</div><h1>Oups…</h1><p>Ce site est réservé à une seule personne au monde.<br>Désolé, ce n'est pas pour vous 🌷</p><button class="alt" onclick="go('s1')">Retour</button></section>
+
+<!-- Étape 2 : le code -->
+<section class="card" id="s2"><div class="big">🔐</div><h1>Le code secret</h1><p>Entre le code que seul ton cœur connaît 🌹</p>
+<input id="code" type="text" placeholder="••••••••" autocomplete="off" autocapitalize="off" spellcheck="false"><br>
+<div class="err" id="err" aria-live="polite"></div><div class="hint" id="hint" aria-live="polite"></div><button onclick="checkCode()">Valider 💗</button></section>
+
+<!-- Étape 3 : Nissi t'a dit je t'aime ? -->
+<section class="card" id="s3"><div class="big">💌</div><h1>Une question…</h1><p>Est-ce que <b>Nissi</b> t'a dit qu'il t'aimait aujourd'hui ?</p>
+<button onclick="said(true)">Oui 💕</button><button class="alt" onclick="said(false)">Non</button></section>
+
+<section class="card" id="sYes"><div class="big">🥰</div><h1>C'est excellent !</h1><p>Il a bien raison, tu mérites de l'entendre tous les jours. Mais attends, il a encore quelque chose à te dire…</p><button onclick="showMsg()">Lire mon message du jour 💌</button></section>
+
+<section class="card" id="sNon"><div class="big">⏳</div><h1>Pas encore ?</h1><p>Alors attends son message du jour… il a pensé à toi 💗</p><button onclick="showMsg()">Ouvrir mon message 💌</button></section>
+
+<!-- Enveloppe -->
+<section class="card" id="sEnv"><h1>Tu as du courrier 💌</h1>
+<div class="env" id="env" role="button" tabindex="0" aria-label="Ouvrir l'enveloppe" onclick="openEnv()" onkeydown="if(event.key==='Enter'||event.key===' ')openEnv()"><div class="letter"></div><div class="flap"></div><div class="seal">💗</div></div>
+<p>Touche l'enveloppe pour l'ouvrir 🌹</p></section>
+
+<!-- Message du jour (carte à gratter) -->
+<section class="card" id="s4"><h1 id="hello">Pour toi, Soraya 💖</h1><div class="date" id="date"></div><div class="sw" id="sw"><div class="msg" id="msg"></div><canvas id="scratch" aria-hidden="true"></canvas></div>
+<button class="alt small" id="skipBtn" onclick="reveal()">Révéler d'un coup ✨</button><div class="sig">Ton Nissi 💋</div>
+<div class="live" id="live"></div>
+<button onclick="go('s5')">Continuer 🌸</button>
+<button class="alt small" id="moreBtn" aria-expanded="false" aria-controls="more" onclick="toggleMore()">Plus de douceurs 💗</button>
+<div class="more" id="more" hidden>
+<button class="alt tile" onclick="copyMsg(this)">📋&#10;Copier</button>
+<button class="alt tile" onclick="showHistory()">📖&#10;Messages précédents</button>
+<button class="alt tile" onclick="showOpen()">💌&#10;Ouvre quand…</button>
+<button class="alt tile" onclick="showTimeline()">⏳&#10;Notre histoire</button>
+<button class="alt tile" onclick="showNight()">🌙&#10;Bonne nuit</button>
+<button class="alt tile" id="wa" hidden onclick="sendKiss()">😘&#10;Bisou à Nissi</button>
+</div></section>
+
+<section class="card" id="s5"><div class="big">🌷</div><h1>Dis-moi…</h1><p>Est-ce que tu aimes ce message ?</p>
+<button onclick="liked(true)">Oui, je l'adore 💕</button><button class="alt" onclick="liked(false)">Pas trop…</button></section>
+
+<!-- Bouquet -->
+<section class="card" id="sBq"><h1>Ce bouquet est pour toi 💐</h1>
+<svg class="bq" viewBox="0 0 200 220" id="bq"></svg>
+<p>Chaque fleur, c'est un « je t'aime » de plus.<br>Reviens demain, un nouveau message t'attendra 💗</p>
+<button class="alt" onclick="showOpen()">Ouvre quand… 💌</button><button class="alt" onclick="showTimeline()">Notre histoire ⏳</button><button class="alt" onclick="showNight()">Message de bonne nuit 🌙</button></section>
+
+<section class="card" id="sSad"><div class="big">🥺</div><h1>Oh…</h1><p>Il en écrira un encore plus beau demain. Il t'aime de tout son cœur, quoi qu'il arrive 💗</p><button onclick="go('s4')">Relire le message</button></section>
+
+<!-- Messages précédents -->
+<section class="card" id="sHist"><h1>Mes messages 📖</h1><div id="histList" class="hist"></div>
+<button class="alt" id="favBtn" onclick="toggleFav()">Voir mes ❤️</button><button onclick="go('s4')">Retour 💌</button></section>
+
+<!-- Ouvre quand… -->
+<section class="card" id="sOpen"><h1>Ouvre quand… 💌</h1><div id="openList"></div><div class="msg" id="openText" hidden></div><button onclick="go('s4')">Retour 💌</button></section>
+
+<!-- Notre histoire -->
+<section class="card" id="sTime"><h1>Notre histoire ⏳</h1><div class="hist" id="timeList"></div><button onclick="go('s4')">Retour 💌</button></section>
+
+<!-- Bonne nuit -->
+<section class="card" id="sNuit"><div class="big">🌙</div><h1>Bonne nuit 🌙</h1><div class="msg" id="nuitText"></div><div class="sig">Ton Nissi 💋</div>
+<button class="alt" onclick="copyNight(this)">Copier le message 📋</button>
+<button onclick="go('s4')">Retour 💌</button></section>
+
+<script src="/.netlify/functions/api?a=contenu.js" onerror="var x=document.createElement('script');x.src='contenu.enc.js';document.head.appendChild(x)"></script>
+<script src="script.js"></script>
+<script src="nuit.js"></script>
+<script src="suivi.js"></script>
+</body>
+</html>

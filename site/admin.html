@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Soraya</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg1:#ffe6e6;--bg2:#ee7f86;--card:rgba(255,255,255,.84);--paper:rgba(255,238,238,.88);--ink:#5c0f14;--mute:#9a4a50;--accent:#e0262d;--accent2:#b3121b;--line:rgba(224,38,45,.28);--shadow:rgba(179,18,27,.32);--field:#fff;--ok:#1f8a5b;--err:#b3121b}
+@media(prefers-color-scheme:dark){:root{--bg1:#2a0508;--bg2:#7a1118;--card:rgba(40,8,12,.86);--paper:rgba(255,255,255,.07);--ink:#ffdede;--mute:#e0a0a5;--accent:#ff5a63;--accent2:#ff8a90;--line:rgba(255,90,99,.34);--shadow:rgba(0,0,0,.55);--field:rgba(255,255,255,.08);--ok:#5fd6a0;--err:#ff8a90}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--ink);font:16px/1.55 'Quicksand',system-ui,sans-serif;padding:18px 14px 34px;background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.5),transparent 40%),linear-gradient(135deg,var(--bg1),var(--bg2) 60%,var(--bg1));background-attachment:fixed}
+main{max-width:780px;margin:0 auto}
+h1{font:700 2.7rem/1.1 'Dancing Script',cursive,serif;margin:.2rem 0 1rem;text-align:center;color:var(--accent2)}
+.card{background:var(--card);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.55);border-radius:26px;padding:20px;margin-bottom:16px;box-shadow:0 12px 30px var(--shadow)}
+label{display:block;font-weight:700;margin:.8rem 0 .3rem}
+input,textarea{width:100%;font:inherit;color:var(--ink);background:var(--field);border:2px solid var(--line);border-radius:14px;padding:11px 14px;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--line)}
+textarea{min-height:120px;resize:vertical}
+button{font:inherit;font-weight:700;border:0;border-radius:999px;padding:11px 22px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;cursor:pointer;box-shadow:0 6px 14px var(--shadow);transition:transform .15s}
+button:hover{transform:translateY(-1px)}button:active{transform:scale(.97)}
+button.alt{background:transparent;color:var(--accent2);border:2px solid var(--accent);box-shadow:none}
+button.sm{padding:6px 14px;font-size:.85rem}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px}
+.tabs button{background:var(--card);color:var(--ink);border:2px solid var(--line);box-shadow:none}
+.tabs button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 6px 14px var(--shadow)}
+.item{background:var(--paper);border-left:5px solid var(--accent);border-radius:16px;padding:12px 14px;margin-top:12px}
+.item:first-child{margin-top:0}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--mute);font-size:.85rem;margin-bottom:6px}
+.today{color:var(--accent2);font-weight:700}
+.note{color:var(--mute);font-size:.92rem}
+.err{color:var(--err);font-weight:700;margin-top:8px}
+.ok{color:var(--ok);font-weight:700;margin-top:8px}
+.bar{position:sticky;bottom:0;padding:12px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Admin · Soraya 💗</h1>
+
+<section class="card" id="login">
+  <p class="note">Page privée : ouvre-la sur ton site, à l'adresse /admin.html.</p>
+  <label for="apw">1. Mot de passe administrateur (celui de Netlify)</label>
+  <input type="password" id="apw" autocomplete="off">
+  <label for="code">2. Le code secret de Soraya</label>
+  <input type="text" id="code" autocomplete="off" autocapitalize="off" spellcheck="false">
+  <label for="file">3. Fichier contenu.enc.js (seulement si rien n'est encore publié)</label>
+  <input type="file" id="file" accept=".js">
+  <p><button id="open">Ouvrir mes textes</button></p>
+  <div class="err" id="loginErr"></div>
+</section>
+
+<section id="editor" hidden>
+  <div class="tabs" id="tabs"></div>
+  <div class="card" id="panel"></div>
+  <div class="bar">
+    <button id="pub">Publier sur le site</button> <button id="save" class="alt">Télécharger une copie</button>
+    <span id="saveMsg"></span>
+  </div>
+  <p class="note">« Publier » envoie tes textes au site : Soraya les voit en rechargeant la page, sans redéployer.</p>
+</section>
+</main>
+
+<script>
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = u => { let s = ''; u.forEach(c => s += String.fromCharCode(c)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const $ = id => document.getElementById(id);
+const START = Date.UTC(2026, 9, 15);           // 15 octobre 2026, comme script.js
+const ITER = 200000;
+let D = null, CODE = '', tab = 'activite', PW = '', ST = null;
+const two = n => String(n).padStart(2, '0');
+const hm = t => { const d = new Date(t); return two(d.getHours()) + 'h' + two(d.getMinutes()); };
+const fmt = t => new Date(t).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hm(t);
+async function api(action, extra) {
+  let r;
+  try { r = await fetch('/.netlify/functions/api?a=admin', { method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-password': PW }, body: JSON.stringify({ action, ...extra }) }); }
+  catch (e) { throw new Error('Serveur injoignable : ouvre cette page depuis ton site Netlify (/admin.html).'); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Erreur ' + r.status);
+  return j;
+}
+
+async function cle(code, salt, iter, usage) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, usage);
+}
+const norm = s => s.trim().toLowerCase();
+
+$('open').onclick = async () => {
+  $('loginErr').textContent = '';
+  try {
+    PW = $('apw').value;
+    ST = await api('etat');
+    const f = $('file').files[0];
+    let C = ST.blob;
+    if (f) { const txt = await f.text(); C = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1)); }
+    if (!C) throw new Error('Rien n\'est encore publié : choisis ton fichier contenu.enc.js.');
+    const code = norm($('code').value);
+    let clair;
+    try {
+      clair = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(C.iv) },
+        await cle(code, unb64(C.salt), C.iter, ['decrypt']), unb64(C.data));
+    } catch (e) { throw new Error('Code incorrect, ou fichier qui ne correspond pas à ce code.'); }
+    const d = JSON.parse(dec.decode(clair));
+    D = { messages: d.messages || [], nuit: d.nuit || [], lettres: d.lettres || [],
+          moments: d.moments || [], whatsapp: d.whatsapp || '' };
+    CODE = code;
+    $('login').hidden = true; $('editor').hidden = false;
+    drawTabs(); draw();
+  } catch (e) { $('loginErr').textContent = e.message; }
+};
+
+const TABS = [['activite', 'Activité'], ['acces', 'Accès'], ['messages', 'Messages du jour'], ['nuit', 'Bonne nuit'], ['lettres', 'Ouvre quand…'],
+              ['moments', 'Notre histoire'], ['reglages', 'Réglages']];
+function drawTabs() {
+  $('tabs').innerHTML = '';
+  TABS.forEach(([k, n]) => {
+    const b = document.createElement('button');
+    b.textContent = n; b.className = k === tab ? 'on' : '';
+    b.onclick = () => { tab = k; drawTabs(); draw(); };
+    $('tabs').appendChild(b);
+  });
+}
+
+function dateDe(i) {
+  const t = START + i * 86400000;
+  const d = new Date(t), a = new Date(), now = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  return { txt: d.toLocaleDateString('fr-FR', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }), today: t === now };
+}
+
+function el(tag, props, ...kids) {
+  const e = Object.assign(document.createElement(tag), props || {});
+  kids.forEach(k => e.append(k)); return e;
+}
+
+function champ(label, valeur, onchange, multiline) {
+  const wrap = el('div');
+  wrap.append(el('label', { textContent: label }));
+  const f = el(multiline ? 'textarea' : 'input', { value: valeur });
+  f.oninput = () => onchange(f.value);
+  wrap.append(f); return wrap;
+}
+
+function draw() {
+  const p = $('panel'); p.innerHTML = '';
+  $('saveMsg').textContent = '';
+  if (tab === 'activite') {
+    const aj = new Date().toDateString(), lu = ST.log.filter(x => x.e === 'Message du jour ouvert' && new Date(x.t).toDateString() === aj);
+    p.append(el('p', { className: lu.length ? 'ok' : 'note', textContent: lu.length ? '✅ Message du jour ouvert aujourd\'hui à ' + hm(lu[0].t) : '⏳ Pas encore ouvert aujourd\'hui' }));
+    if (!lu.length) {
+      const wa = el('button', { className: 'sm', textContent: '💬 Rappel sur WhatsApp' });
+      wa.onclick = () => {
+        let n = ''; try { n = localStorage.getItem('soraya_wa') || ''; } catch (_) {}
+        n = prompt('Numéro WhatsApp de Soraya (format international, sans + ni espaces)', n);
+        if (!n) return; n = n.replace(/\D/g, '');
+        try { localStorage.setItem('soraya_wa', n); } catch (_) {}
+        window.open('https://wa.me/' + n + '?text=' + encodeURIComponent('Coucou ma Soraya 💗 Ton message du jour t\'attend sur ton site : ' + location.origin + ' 🌸'), '_blank');
+      };
+      p.append(wa, ' ');
+    }
+    const r = el('button', { className: 'alt sm', textContent: 'Actualiser' });
+    r.onclick = async () => { ST = await api('etat'); draw(); };
+    const x = el('button', { className: 'alt sm', textContent: 'Effacer l\'historique' });
+    x.onclick = async () => { if (confirm('Effacer tout l\'historique ?')) { await api('effacer'); ST.log = []; draw(); } };
+    p.append(r, ' ', x);
+    if (!ST.log.length) p.append(el('p', { className: 'note', textContent: 'Aucune activité pour l\'instant.' }));
+    ST.log.slice().reverse().forEach(v => p.append(el('div', { className: 'item', textContent: fmt(v.t) + ' · ' + v.e })));
+    return;
+  }
+  if (tab === 'acces') {
+    p.append(el('p', { className: ST.blocked ? 'err' : 'ok', textContent: ST.blocked ? '🔒 L\'accès de Soraya est bloqué.' : '✅ Soraya a accès au site.' }));
+    const b = el('button', { textContent: ST.blocked ? 'Rétablir l\'accès' : 'Bloquer l\'accès' });
+    b.onclick = async () => { if (!ST.blocked && !confirm('Bloquer l\'accès de Soraya ?')) return; await api('bloquer', { value: !ST.blocked }); ST.blocked = !ST.blocked; draw(); };
+    p.append(b, el('p', { className: 'note', textContent: 'Bloqué, le site affiche « Accès suspendu » et ne lui envoie plus ses textes. Une ancienne version déjà ouverte sur son téléphone peut rester visible jusqu\'au rechargement.' }));
+    return;
+  }
+  if (tab === 'reglages') {
+    p.append(champ('Numéro WhatsApp de Nissi (format international, sans + ni espaces ; vide = bouton caché)', D.whatsapp, v => D.whatsapp = v.trim()));
+    p.append(champ('Nouveau code secret (laisse vide pour garder le même)', '', v => { D.newCode = v; }));
+    p.append(el('p', { className: 'note', textContent: 'Si tu changes le code, Soraya devra taper le nouveau.' }));
+    return;
+  }
+  if (tab === 'messages' || tab === 'nuit') {
+    p.append(el('p', { className: 'note', textContent: 'Ajoute les nouveaux messages à la fin. Supprimer un message décale tous les suivants d\'un jour. Les messages déjà envoyés ne devraient pas être déplacés.' }));
+  }
+  const L = D[tab];
+  L.forEach((it, i) => {
+    const box = el('div', { className: 'item' });
+    const head = el('div', { className: 'head' });
+    let lab = '#' + (i + 1);
+    if (tab === 'messages' || tab === 'nuit') {
+      const d = dateDe(i); lab += ' · ' + d.txt;
+      head.append(el('span', { className: d.today ? 'today' : '', textContent: lab + (d.today ? ' · aujourd\'hui' : '') }));
+    } else head.append(el('span', { textContent: lab }));
+    const del = el('button', { className: 'alt sm', textContent: 'Supprimer' });
+    del.onclick = () => { if (confirm('Supprimer cet élément ?')) { L.splice(i, 1); draw(); } };
+    head.append(del); box.append(head);
+    if (tab === 'messages' || tab === 'nuit') box.append(champ('', it, v => L[i] = v, true).lastChild);
+    if (tab === 'lettres') { box.append(champ('Titre du bouton', it.t, v => it.t = v)); box.append(champ('Lettre', it.m, v => it.m = v, true)); }
+    if (tab === 'moments') {
+      const dt = champ('Date', it.date, v => it.date = v); dt.lastChild.type = 'date';
+      box.append(dt); box.append(champ('Texte', it.text, v => it.text = v, true));
+    }
+    p.append(box);
+  });
+  const add = el('button', { className: 'sm', textContent: '+ Ajouter' });
+  add.style.marginTop = '14px';
+  add.onclick = () => {
+    if (tab === 'lettres') L.push({ t: '', m: '' });
+    else if (tab === 'moments') L.push({ date: '', text: '' });
+    else L.push('');
+    draw(); window.scrollTo(0, document.body.scrollHeight);
+  };
+  p.append(add);
+}
+
+async function sauver(pub) {
+  const msg = $('saveMsg'); msg.className = ''; msg.textContent = '';
+  try {
+    for (const k of ['messages', 'nuit']) {
+      if (!D[k].length) throw new Error('« ' + k + ' » ne peut pas être vide.');
+      if (D[k].some(m => !m.trim())) throw new Error('Un message est vide dans « ' + k + ' ».');
+    }
+    if (!D.lettres.length || D.lettres.some(l => !l.t.trim() || !l.m.trim())) throw new Error('Chaque lettre doit avoir un titre et un texte.');
+    if (D.moments.some(m => !m.date || !m.text.trim())) throw new Error('Chaque moment doit avoir une date et un texte.');
+    let code = CODE;
+    if (D.newCode && norm(D.newCode)) {
+      code = norm(D.newCode);
+      if (code.length < 12 && !confirm('Ce code est court. Continuer quand même ?')) return;
+    }
+    const payload = JSON.stringify({ messages: D.messages, nuit: D.nuit, lettres: D.lettres, moments: D.moments, whatsapp: D.whatsapp });
+    const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await cle(code, salt, ITER, ['encrypt']), enc.encode(payload)));
+    const back = dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await cle(code, salt, ITER, ['decrypt']), data));
+    if (back !== payload) throw new Error('Vérification échouée.');
+    const C = { v: 1, iter: ITER, salt: b64(salt), iv: b64(iv), data: b64(data) };
+    if (pub) await api('publier', { blob: C });
+    else {
+      const out = '// Fichier généré par chiffrer.js : contenu chiffré (AES-GCM). Ne pas modifier à la main.\n' + 'const CONTENU_CHIFFRE = ' + JSON.stringify(C) + ';\n';
+      const a = el('a', { href: URL.createObjectURL(new Blob([out], { type: 'text/javascript' })), download: 'contenu.enc.js' });
+      document.body.append(a); a.click(); a.remove();
+    }
+    CODE = code; delete D.newCode;
+    msg.className = 'ok'; msg.textContent = pub ? '✅ Publié : Soraya voit les changements.' : '✅ Copie téléchargée et vérifiée.';
+  } catch (e) { msg.className = 'err'; msg.textContent = e.message; }
+}
+$('save').onclick = () => sauver(false); $('pub').onclick = () => sauver(true);
+</script>
+</body>
+</html>
