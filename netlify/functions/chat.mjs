@@ -53,7 +53,10 @@ export default async (req) => {
     const other = role === 'admin' ? 'soraya' : 'admin';
     const typingAt = (mt.typing && mt.typing[other]) || 0;
     const isTyping = (Date.now() - typingAt) < 6000;
-    return json({ messages, ids: keys.slice(-300), me: role, lu: mt.lu || {}, maj, updates, cache, isTyping });
+    // Présence (« en ligne » / « vu à ») : horodatage de la dernière visite de chacun, écrit au plus toutes les 20 s.
+    const now = Date.now(), vus = (await s.get('chat-seen', { type: 'json' })) || {};
+    if (now - (vus[role] || 0) > 20000) { vus[role] = now; await s.setJSON('chat-seen', vus); }
+    return json({ messages, ids: keys.slice(-300), me: role, lu: mt.lu || {}, maj, updates, cache, isTyping, seen: vus[other] || 0, now });
   }
 
   if (req.method === 'POST') {

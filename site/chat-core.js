@@ -26,6 +26,21 @@
   }
   const tokenHash = async t => hex(await sha(enc.encode(t)));   // empreinte envoyée au serveur par l'admin
 
+  const ICON = {
+    send: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12z"/></svg>',
+    clip: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M16.5 6v11.5a4 4 0 0 1-8 0V5a2.5 2.5 0 0 1 5 0v10.5a1 1 0 0 1-2 0V6H10v9.5a2.5 2.5 0 0 0 5 0V5a4 4 0 0 0-8 0v12.5a5.5 5.5 0 0 0 11 0V6z"/></svg>',
+    smile: '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-3.5-9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM12 17.5c2.3 0 4.2-1.4 5-3.5H7c.8 2.1 2.7 3.5 5 3.5z"/></svg>',
+    search: '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 14 15.5l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>'
+  };
+  function dayLabel(d) {
+    const a = new Date(); a.setHours(0, 0, 0, 0); const b = new Date(d); b.setHours(0, 0, 0, 0);
+    const diff = Math.round((a - b) / 86400000);
+    if (diff === 0) return 'Aujourd’hui'; if (diff === 1) return 'Hier';
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
   function ChatUI(o) {
     const root = o.box; root.textContent = ''; root.classList.add('chat');
     const list = el('div', 'chat-list'), info = el('div', 'chat-info');
@@ -44,11 +59,13 @@
 
     const bar = el('div', 'chat-bar');
     const file = el('input'); file.type = 'file'; file.accept = 'image/*,video/*'; file.hidden = true;
-    const bFile = el('button', 'chat-ico', '📎'), bSticker = el('button', 'chat-ico', '🧸'), bMic = el('button', 'chat-ico', '🎤'), bSend = el('button', 'chat-send', '➤');
+    const bFile = el('button', 'chat-ico', ''), bSticker = el('button', 'chat-ico', ''), bMic = el('button', 'chat-send', ''), bSend = el('button', 'chat-send', '');
+    bFile.innerHTML = ICON.clip; bSticker.innerHTML = ICON.smile; bMic.innerHTML = ICON.mic; bSend.innerHTML = ICON.send;
     bFile.title = 'Photo ou vidéo'; bSticker.title = 'Stickers'; bMic.title = 'Message vocal'; bSend.title = 'Envoyer';
     bFile.setAttribute('aria-label', 'Envoyer une photo ou une vidéo'); bSticker.setAttribute('aria-label', 'Envoyer un sticker'); bMic.setAttribute('aria-label', 'Enregistrer un vocal'); bSend.setAttribute('aria-label', 'Envoyer');
-    const txt = el('textarea', 'chat-input'); txt.rows = 1; txt.placeholder = 'Écris un message (ou glisse une photo)…'; txt.maxLength = 3000;
-    bar.append(bFile, bSticker, txt, bMic, bSend, file);
+    const txt = el('textarea', 'chat-input'); txt.rows = 1; txt.placeholder = 'Écris un message'; txt.maxLength = 3000;
+    const pill = el('div', 'chat-pill'); pill.append(bSticker, txt, bFile);
+    bar.append(pill, bMic, bSend, file);
 
     // Panneau de stickers
     const STICKERS = ['🧸', '💖', '🌸', '🥰', '😻', '🍓', '✨', '🦋', '💌', '🌹', '🍫', '🧸', '💗', '💋', '🌻', '🎁'];
@@ -64,7 +81,7 @@
     bSticker.onclick = () => { stickerPanel.hidden = !stickerPanel.hidden; };
 
     const recBar = el('div', 'chat-rec'); recBar.hidden = true;
-    const recT = el('span', 'chat-rect', '🔴 0:00'), recX = el('button', 'chat-ico', '✕'), recOk = el('button', 'chat-send', '➤');
+    const recT = el('span', 'chat-rect', '🔴 0:00'), recX = el('button', 'chat-ico', '✕'), recOk = el('button', 'chat-send', ''); recOk.innerHTML = ICON.send;
     recX.title = 'Annuler'; recOk.title = 'Envoyer le vocal';
     recBar.append(recX, recT, recOk);
 
@@ -72,15 +89,29 @@
     const WP = [['doux', 'Doux'], ['whatsapp', 'WhatsApp'], ['nuit', 'Nuit'], ['coeurs', 'Cœurs'], ['ciel', 'Ciel'], ['coucher', 'Coucher'], ['rouge', 'Rouge'], ['noir', 'Noir']];
     const wpKey = 'chatWp:' + o.me, wpImgKey = 'chatWpImg:' + o.me;
     const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-    const top = el('div', 'chat-top');
+    const top = el('div', 'chat-top chat-head');
     const searchWrap = el('div', 'chat-search-wrap');
     const searchIn = el('input', 'chat-search'); searchIn.type = 'search'; searchIn.placeholder = '🔍 Rechercher un message…'; searchIn.setAttribute('aria-label', 'Rechercher dans la discussion');
     searchWrap.appendChild(searchIn);
 
-    const bWp = el('button', 'chat-wpbtn', '🎨 Fond');
+    const bWp = el('button', 'chat-hbtn', '🎨'); bWp.title = 'Fond d’écran'; bWp.setAttribute('aria-label', 'Changer le fond d’écran');
     const panel = el('div', 'chat-wp'); panel.hidden = true;
     const wpFile = el('input'); wpFile.type = 'file'; wpFile.accept = 'image/*'; wpFile.hidden = true;
-    top.append(searchWrap, bWp, wpFile);
+    const av = el('div', 'chat-av', otherName.charAt(0));
+    const nm = el('div', 'chat-nm'), stEl = el('small', '', ''); nm.append(el('b', '', otherName), stEl);
+    const bSearch = el('button', 'chat-hbtn', ''); bSearch.innerHTML = ICON.search; bSearch.title = 'Rechercher'; bSearch.setAttribute('aria-label', 'Rechercher dans la discussion');
+    searchWrap.hidden = true;
+    bSearch.onclick = () => { searchWrap.hidden = !searchWrap.hidden; if (!searchWrap.hidden) searchIn.focus(); else { searchIn.value = ''; searchIn.dispatchEvent(new Event('input')); } };
+    top.append(av, nm, bSearch, bWp, wpFile);
+    function setStatus(r) {
+      if (r.isTyping) { stEl.textContent = 'en train d’écrire…'; stEl.className = 'on'; return; }
+      const seen = r.seen || 0, now = r.now || Date.now();
+      if (!seen) { stEl.textContent = ''; stEl.className = ''; return; }
+      if (now - seen < 60000) { stEl.textContent = 'en ligne'; stEl.className = 'on'; return; }
+      const d = new Date(seen), j = dayLabel(d), t = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      stEl.className = '';
+      stEl.textContent = 'vu ' + (j === 'Aujourd’hui' ? 'aujourd’hui' : j === 'Hier' ? 'hier' : 'le ' + d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })) + ' à ' + t;
+    }
 
     const sw = (id, label, extra) => { const b = el('button', 'chat-sw ' + (extra || 'wp-' + id)); b.dataset.wp = id; b.title = label; b.setAttribute('aria-label', 'Fond ' + label); b.appendChild(el('span', '', label)); panel.appendChild(b); return b; };
     function applyWp(id) {
@@ -113,7 +144,7 @@
     };
     bWp.onclick = () => { panel.hidden = !panel.hidden; };
     showMy(); 
-    const savedWp = lsGet(wpKey) || 'doux';
+    const savedWp = lsGet(wpKey) || 'whatsapp';
     applyWp(savedWp);
 
     const editBar = el('div', 'chat-edit'); editBar.hidden = true;
@@ -123,7 +154,7 @@
     // Zone Drag & Drop overlay
     const dropOverlay = el('div', 'chat-drop-overlay', '📥 Dépose ta photo ou vidéo ici pour l’envoyer');
     dropOverlay.hidden = true;
-    root.append(top, panel, list, typingEl, info, replyBar, editBar, stickerPanel, bar, recBar, dropOverlay);
+    root.append(top, searchWrap, panel, list, typingEl, info, replyBar, editBar, stickerPanel, bar, recBar, dropOverlay);
 
     // Recherche en direct dans les messages chargés
     searchIn.addEventListener('input', () => {
@@ -354,8 +385,11 @@
     async function refill(entry, m) { entry.tick = await fill(entry.node, m, entry); entry.deleted = !!m.deleted; refreshTicks(); }
     async function add(m) {
       const row = el('div', 'chat-row ' + (m.from === o.me ? 'me' : 'them'));
-      const day = new Date(m.t).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+      const day = dayLabel(new Date(m.t));
       if (day !== lastDay) { lastDay = day; list.appendChild(el('div', 'chat-day', day)); }
+      const prev = list.lastElementChild;
+      row.dataset.from = m.from;
+      if (!prev || !prev.classList.contains('chat-row') || prev.dataset.from !== m.from) row.classList.add('tail');
       const entry = { node: row, from: m.from, id: m.id, tick: null, deleted: !!m.deleted, plainText: '' };
       shown.set(m.id, entry); list.appendChild(row);
       await refill(entry, m);
@@ -400,8 +434,8 @@
       catch (e) { say('❌ ' + e.message); }
     }
     let editReplyKeep = null;
-    function startEdit(id, text, replyObj) { cancelReply(); editing = id; editReplyKeep = replyObj; txt.value = text; grow(); editBar.hidden = false; bSend.textContent = '✓'; txt.focus(); }
-    function cancelEdit() { editing = ''; editReplyKeep = null; txt.value = ''; grow(); editBar.hidden = true; bSend.textContent = '➤'; }
+    function startEdit(id, text, replyObj) { cancelReply(); editing = id; editReplyKeep = replyObj; txt.value = text; grow(); editBar.hidden = false; bSend.innerHTML = ICON.check; txt.focus(); }
+    function cancelEdit() { editing = ''; editReplyKeep = null; txt.value = ''; grow(); editBar.hidden = true; bSend.innerHTML = ICON.send; }
     editX.onclick = cancelEdit;
 
     // --- Non lus ---
@@ -424,7 +458,7 @@
         const r = await api('/api/chat' + (qs.length ? '?' + qs.join('&') : ''));
         const wasBottom = nearBottom() || !shown.size;
         hidden = new Set(r.cache || []); lu = r.lu || {};
-        typingEl.hidden = !r.isTyping;
+        typingEl.hidden = !r.isTyping; setStatus(r);
         if (lu[o.me] && lu[o.me] > lastRead) lastRead = lu[o.me];
         if (r.ids.length) {
           const set = new Set(r.ids), first = r.ids[0];
@@ -515,7 +549,9 @@
     bSend.onclick = sendText;
     const fine = matchMedia('(pointer:fine)').matches;
     txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && (fine || e.ctrlKey || e.metaKey)) { e.preventDefault(); sendText(); } });
-    function grow() { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; }
+    function syncBtns() { const has = !!txt.value.trim(); bSend.hidden = !has; bMic.hidden = has; }
+    function grow() { txt.style.height = 'auto'; txt.style.height = Math.min(txt.scrollHeight, 120) + 'px'; syncBtns(); }
+    syncBtns();
     txt.addEventListener('input', () => { grow(); notifyTyping(); });
     bFile.onclick = () => file.click();
     file.onchange = async () => {
